@@ -1,0 +1,56 @@
+
+name: build
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/main.yml
+      - "src/**"
+      
+jobs:
+  build_css:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source Git branch
+        uses: actions/checkout@v2
+        with:
+            ref: master
+            fetch-depth: 10
+            submodules: true
+
+      - name: Make destination directory for compiled CSS
+        run: mkdir -vp /tmp
+
+      - name: Compile CSS from SCSS files
+        uses: gha-utilities/sass-build@v0.2.2
+        with:
+          source: src/userstyle.scss
+          destination: /tmp/raw.css
+
+      - name: Add license header
+        run: |
+          (
+            printf "/*\n";
+            awk -F"// " '{print $2}' LICENSE;
+            printf "*/\n";
+            cat /tmp/raw.css;
+          ) > /tmp/userstyle.css
+
+      - name: Move compiled CSS
+        run: mv /tmp/userstyle.css build/
+
+      - name: Add and Commit changes
+        run: |
+          git config --local user.email 'action@github.com'
+          git config --local user.name 'GitHub Action'
+          git add build/*
+          git diff-index --quiet HEAD || git commit -m 'userstyle updated'
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: master
